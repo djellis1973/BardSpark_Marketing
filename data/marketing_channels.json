@@ -1,1 +1,70 @@
 
+# In your app.py or author_persona_discovery.py
+
+import json
+import streamlit as st
+import pandas as pd
+
+@st.cache_data
+def load_marketing_data():
+    """Load the marketing channels database"""
+    with open('data/marketing_channels.json', 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+# Then in your results function, you can use it like this:
+
+def get_personalized_recommendations(author_type, target_countries, genre, goals):
+    """Generate personalized channel recommendations"""
+    data = load_marketing_data()
+    
+    recommendations = []
+    
+    # Start with quick reference for author type
+    quick_ref = data['quick_reference']['author_types'].get(author_type, {})
+    
+    # Add primary channels
+    for channel_name in quick_ref.get('primary', []):
+        # Find full channel details in database
+        channel = find_channel_by_name(data, channel_name)
+        if channel:
+            recommendations.append({
+                'name': channel_name,
+                'priority': 'Primary',
+                'details': channel
+            })
+    
+    # Add country-specific recommendations
+    for country in target_countries:
+        country_channels = get_country_channels(data, country)
+        recommendations.extend(country_channels)
+    
+    return recommendations
+
+def find_channel_by_name(data, name):
+    """Helper to find a channel by name across all categories"""
+    for category in data['categories']:
+        if 'channels' in category:
+            for channel in category['channels']:
+                if name.lower() in channel['name'].lower():
+                    return channel
+        if 'regions' in category:
+            for region in category['regions']:
+                for channel in region['channels']:
+                    if name.lower() in channel['name'].lower():
+                        return channel
+    return None
+
+def get_country_channels(data, country):
+    """Get channels specific to a country"""
+    channels = []
+    for category in data['categories']:
+        if category.get('id') == 'country_specific':
+            for region in category['regions']:
+                if region['country'] == country:
+                    for channel in region['channels']:
+                        channels.append({
+                            'name': channel['name'],
+                            'priority': 'Country-Specific',
+                            'details': channel
+                        })
+    return channels
